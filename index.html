@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -6,14 +7,14 @@
 <title>UVF Institutional Strategic Plan — Reporting Portal</title>
 
 <!-- MSAL Browser Library -->
+
 <script src="https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js"></script>
 
 <script>
-// ─── INITIAL SETUP ─────────────────────────────────────────────
-document.body.style.display = "none"; // hide page until login
+// Hide page until login
+document.body.style.display = "none";
 
 const redirectUri = "https://valleyforgeedu.github.io/Reporting-Portal/";
-
 const msalConfig = {
   auth: {
     clientId: "30bde775-3b2a-4aa1-814d-0991dd3f2bda",
@@ -25,56 +26,48 @@ const msalConfig = {
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 let _account = null;
 let reporterName = localStorage.getItem('uvf_reporter_name') || '';
-const approvedUsers = ["sdsullivan@valleyforge.edu"]; // optional approved users
+const approvedUsers = ["sdsullivan@valleyforge.edu"];
 
-// ─── LOGIN + REDIRECT HANDLING ───────────────────────────────
-async function ensureLogin() {
+// ─── LOGIN & REDIRECT HANDLING ─────────────────────────────
+(async () => {
   try {
     const response = await msalInstance.handleRedirectPromise();
     _account = response?.account || msalInstance.getAllAccounts()[0];
 
     if (!_account) {
+      // No cached account — redirect to Microsoft login immediately
       msalInstance.loginRedirect({ scopes: ["User.Read"], redirectUri });
-      return; // stop until login completes
+      return;
     }
 
     msalInstance.setActiveAccount(_account);
-
     const email = _account.username.toLowerCase();
+
+    // Restrict to @valleyforge.edu
     if (!email.endsWith("@valleyforge.edu")) {
-      document.body.innerHTML = `
-        <h2 style="text-align:center;margin-top:100px;">
-          Access restricted to @valleyforge.edu accounts.
-        </h2>`;
+      document.body.innerHTML = `<h2 style='text-align:center;margin-top:100px;'>Access restricted to @valleyforge.edu accounts.</h2>`;
       document.body.style.display = "block";
       return;
     }
 
+    // Restrict to approved user list
     if (!approvedUsers.includes(email)) {
-      document.body.innerHTML = `
-        <h2 style="text-align:center;margin-top:100px;">
-          Access restricted to approved users only.
-        </h2>`;
+      document.body.innerHTML = `<h2 style='text-align:center;margin-top:100px;'>Access restricted to approved users only.</h2>`;
       document.body.style.display = "block";
       return;
     }
 
+    // Login successful — show page
     await runPortalAfterLogin();
 
   } catch (err) {
     console.error("Login failed:", err);
-    document.body.innerHTML = `
-      <h2 style="text-align:center;margin-top:100px;">
-        Microsoft login required — check console for details.
-      </h2>`;
+    document.body.innerHTML = `<h2 style='text-align:center;margin-top:100px;'>Microsoft login required — check console for details.</h2>`;
     document.body.style.display = "block";
   }
-}
+})();
 
-// Start login immediately on page load
-ensureLogin();
-
-// ─── OD + PORTAL LOGIC ───────────────────────────────────────
+// ─── PORTAL / OD INITIALIZATION ─────────────────────────────
 async function runPortalAfterLogin() {
   document.body.style.display = "block";
 
@@ -84,7 +77,6 @@ async function runPortalAfterLogin() {
     updateNavAvatar();
   }
 
-  // OD push/pull helpers
   async function push(silent=false) {
     if (!OD || !_account) return;
     if (!silent) setUI('Pushing to OneDrive…', 'syncing', 'connected');
@@ -145,7 +137,6 @@ async function runPortalAfterLogin() {
     setUI('Not connected', 'disconnected', 'disconnected');
   }
 
-  // Initialize OD and portal UI
   try {
     await OD.init();
     await pull();
@@ -163,11 +154,9 @@ async function runPortalAfterLogin() {
     document.body.appendChild(errEl);
   }
 
-  // Expose helpers globally if needed
   window.ODPortal = { push, pull, disconnect };
 }
 
-// ─── OD MODAL LOGIN HELPER ───────────────────────────────
 async function odLogin(clientId, reporterInput) {
   if (reporterInput) {
     reporterName = reporterInput.trim();
@@ -181,6 +170,7 @@ async function odLogin(clientId, reporterInput) {
   await msalInstance.loginRedirect({ scopes: ["User.Read"], redirectUri });
 }
 </script>
+
   
 <link href="./UVF Institutional Strategic Plan — Reporting Portal_files/css2" rel="stylesheet">
 <style>
