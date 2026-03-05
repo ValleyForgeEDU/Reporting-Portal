@@ -1636,22 +1636,18 @@ const OD = (() => {
   }
 
 // ─── MICROSOFT AUTH + OD INIT ────────────────────────────────────────────────
-
 const msalConfig = {
   auth: {
     clientId: "30bde775-3b2a-4aa1-814d-0991dd3f2bda",
     authority: "https://login.microsoftonline.com/aaa272b8-3164-4829-9149-92c872fd36df",
-    redirectUri: "https://valleyforgeedu.github.io/Reporting-Portal/" // must match Azure
+    redirectUri: "https://valleyforgeedu.github.io/Reporting-Portal/" // matches Azure
   }
 };
 
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 let _account = null;
 let reporterName = localStorage.getItem('uvf_reporter_name') || '';
-
-const approvedUsers = [
-  "sdsullivan@valleyforge.edu",
-];
+const approvedUsers = ["sdsullivan@valleyforge.edu"]; // your approved list
 
 async function startPortal() {
   try {
@@ -1659,47 +1655,43 @@ async function startPortal() {
     _account = response?.account || msalInstance.getAllAccounts()[0];
 
     if (!_account) {
-      await msalInstance.loginRedirect({ 
+      await msalInstance.loginRedirect({
         scopes: ["User.Read"],
-        redirectUri: "https://valleyforgeedu.github.io/Reporting-Portal/" 
+        redirectUri: "https://valleyforgeedu.github.io/Reporting-Portal/"
       });
-      return; // stop execution until redirect completes
+      return;
     }
 
     msalInstance.setActiveAccount(_account);
-
     const userEmail = _account.username.toLowerCase();
 
-    // Check domain
     if (!userEmail.endsWith("@valleyforge.edu")) {
       document.body.innerHTML =
         "<h2 style='text-align:center;margin-top:100px;'>Access restricted to @valleyforge.edu accounts.</h2>";
-      throw new Error("Unauthorized domain");
+      return;
     }
 
-    // Check approved users
     if (!approvedUsers.includes(userEmail)) {
       document.body.innerHTML =
         "<h2 style='text-align:center;margin-top:100px;'>Access restricted to approved users only.</h2>";
-      throw new Error("User not approved");
+      return;
     }
 
     // Show page
     document.body.style.display = "block";
 
-    // Save reporter name if not already set
+    // Save reporter name
     if (!reporterName) {
       reporterName = _account.name || _account.username;
       localStorage.setItem('uvf_reporter_name', reporterName);
       updateNavAvatar();
     }
 
-    // Initialize OD
+    // Initialize OD and portal UI after login
     await OD.init();
     await OD.pull();
     setInterval(() => OD.pull(), 60000);
 
-    // Start portal UI
     loadReport();
     renderSidebar();
     renderEditor();
@@ -1708,13 +1700,13 @@ async function startPortal() {
     console.log("Logged in:", userEmail);
 
   } catch (error) {
+    console.error(error);
     document.body.innerHTML =
       "<h2 style='text-align:center;margin-top:100px;'>Microsoft login required.</h2>";
-    console.error(error);
   }
 }
 
-// Unified OD login function for modal setup
+// OD login function for modal
 async function odLogin(clientId, reporterInput) {
   if (reporterInput) {
     reporterName = reporterInput.trim();
@@ -1728,7 +1720,7 @@ async function odLogin(clientId, reporterInput) {
     msalInstance.config.auth.clientId = clientId;
   }
 
-  await msalInstance.loginRedirect({ 
+  await msalInstance.loginRedirect({
     scopes: ["User.Read"],
     redirectUri: "https://valleyforgeedu.github.io/Reporting-Portal/"
   });
