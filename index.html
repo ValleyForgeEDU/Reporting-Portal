@@ -1639,44 +1639,47 @@ const OD = (() => {
 
 // ─── FULL PORTAL + MSAL + OD LOGIN ─────────────────────────────────────────────
 
+// ─── FULL WORKING PORTAL + MSAL + OD LOGIN ───────────────────────────────────
+
+const redirectUri = "https://valleyforgeedu.github.io/Reporting-Portal/";
+const approvedUsers = ["sdsullivan@valleyforge.edu"]; // extend as needed
+
+// MSAL config
 const msalConfig = {
   auth: {
     clientId: "30bde775-3b2a-4aa1-814d-0991dd3f2bda",
     authority: "https://login.microsoftonline.com/aaa272b8-3164-4829-9149-92c872fd36df",
-    redirectUri: "https://valleyforgeedu.github.io/Reporting-Portal/" // must match Azure exactly
+    redirectUri
   }
 };
 
 const msalInstance = new msal.PublicClientApplication(msalConfig);
-
 let _account = null;
 let reporterName = localStorage.getItem('uvf_reporter_name') || '';
-const approvedUsers = ["sdsullivan@valleyforge.edu"]; // extend as needed
-const redirectUri = "https://valleyforgeedu.github.io/Reporting-Portal/";
 
-// --- MAIN PORTAL STARTUP ---
+// --- START PORTAL ---
 async function startPortal() {
   try {
-    // Handle redirect response after Microsoft login
+    // Handle redirect from Microsoft login
     const response = await msalInstance.handleRedirectPromise();
 
-    // Get account from response or from cached accounts
+    // Get account from response or cached accounts
     _account = response?.account || msalInstance.getAllAccounts()[0];
 
     if (!_account) {
-      // No account → trigger redirect login
+      // No logged-in account → redirect to Microsoft login
       await msalInstance.loginRedirect({
         scopes: ["User.Read"],
         redirectUri
       });
-      return; // stop execution until login completes
+      return; // stop until redirect completes
     }
 
     msalInstance.setActiveAccount(_account);
 
     const userEmail = _account.username.toLowerCase();
 
-    // Enforce email domain
+    // Enforce allowed domain
     if (!userEmail.endsWith("@valleyforge.edu")) {
       document.body.innerHTML =
         "<h2 style='text-align:center;margin-top:100px;'>Access restricted to @valleyforge.edu accounts.</h2>";
@@ -1690,7 +1693,7 @@ async function startPortal() {
       return;
     }
 
-    // Show page content
+    // Show page
     document.body.style.display = "block";
 
     // Persist reporter name
@@ -1703,9 +1706,9 @@ async function startPortal() {
     // Initialize OneDrive integration
     await OD.init();
     await OD.pull();
-    setInterval(() => OD.pull(), 60000);
+    setInterval(() => OD.pull(), 60000); // background sync
 
-    // Initialize portal UI
+    // Portal UI
     loadReport();
     renderSidebar();
     renderEditor();
@@ -1720,7 +1723,7 @@ async function startPortal() {
   }
 }
 
-// --- OD LOGIN FUNCTION FOR MODAL ---
+// --- OD LOGIN FOR MODAL ---
 async function odLogin(clientId, reporterInput) {
   if (reporterInput) {
     reporterName = reporterInput.trim();
@@ -1741,7 +1744,7 @@ async function odLogin(clientId, reporterInput) {
 }
 
 // --- PAGE LOAD ---
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
   document.body.style.display = "none"; // hide until login check completes
   startPortal();
 });
