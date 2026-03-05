@@ -1641,7 +1641,7 @@ const msalConfig = {
   auth: {
     clientId: "30bde775-3b2a-4aa1-814d-0991dd3f2bda",
     authority: "https://login.microsoftonline.com/aaa272b8-3164-4829-9149-92c872fd36df",
-    redirectUri: window.location.origin
+    redirectUri: "https://valleyforgeedu.github.io/Reporting-Portal/" // must match Azure
   }
 };
 
@@ -1649,20 +1649,20 @@ const msalInstance = new msal.PublicClientApplication(msalConfig);
 let _account = null;
 let reporterName = localStorage.getItem('uvf_reporter_name') || '';
 
-// List of specifically approved users
 const approvedUsers = [
   "sdsullivan@valleyforge.edu",
 ];
 
-// Initialize the portal after login
 async function startPortal() {
   try {
     const response = await msalInstance.handleRedirectPromise();
-
     _account = response?.account || msalInstance.getAllAccounts()[0];
 
     if (!_account) {
-      await msalInstance.loginRedirect({ scopes: ["User.Read"] });
+      await msalInstance.loginRedirect({ 
+        scopes: ["User.Read"],
+        redirectUri: "https://valleyforgeedu.github.io/Reporting-Portal/" 
+      });
       return; // stop execution until redirect completes
     }
 
@@ -1671,16 +1671,16 @@ async function startPortal() {
     const userEmail = _account.username.toLowerCase();
 
     // Check domain
-    if (!userEmail.endsWith("@vfcc.edu")) {
+    if (!userEmail.endsWith("@valleyforge.edu")) {
       document.body.innerHTML =
-        "<h2 style='font-family:sans-serif;text-align:center;margin-top:100px;'>Access restricted to VFCC accounts.</h2>";
+        "<h2 style='text-align:center;margin-top:100px;'>Access restricted to @valleyforge.edu accounts.</h2>";
       throw new Error("Unauthorized domain");
     }
 
     // Check approved users
     if (!approvedUsers.includes(userEmail)) {
       document.body.innerHTML =
-        "<h2 style='font-family:sans-serif;text-align:center;margin-top:100px;'>Access restricted to approved users only.</h2>";
+        "<h2 style='text-align:center;margin-top:100px;'>Access restricted to approved users only.</h2>";
       throw new Error("User not approved");
     }
 
@@ -1709,7 +1709,7 @@ async function startPortal() {
 
   } catch (error) {
     document.body.innerHTML =
-      "<h2 style='font-family:sans-serif;text-align:center;margin-top:100px;'>Microsoft login required.</h2>";
+      "<h2 style='text-align:center;margin-top:100px;'>Microsoft login required.</h2>";
     console.error(error);
   }
 }
@@ -1728,7 +1728,10 @@ async function odLogin(clientId, reporterInput) {
     msalInstance.config.auth.clientId = clientId;
   }
 
-  await msalInstance.loginRedirect({ scopes: ["User.Read"] });
+  await msalInstance.loginRedirect({ 
+    scopes: ["User.Read"],
+    redirectUri: "https://valleyforgeedu.github.io/Reporting-Portal/"
+  });
 }
 
 // Start portal
