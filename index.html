@@ -1662,7 +1662,11 @@ async function startPortal() {
     _account = response?.account || msalInstance.getAllAccounts()[0];
 
     if (!_account) {
-      await msalInstance.loginRedirect({ scopes: ["User.Read"] });
+      // ← This is where you trigger login
+      await msalInstance.loginRedirect({
+        scopes: ["User.Read"],
+        redirectUri: "https://valleyforgeedu.github.io/Reporting-Portal/"
+      });
       return; // stop execution until redirect completes
     }
 
@@ -1671,7 +1675,7 @@ async function startPortal() {
     const userEmail = _account.username.toLowerCase();
 
     // Check domain
-    if (!userEmail.endsWith("@vfcc.edu")) {
+    if (!userEmail.endsWith("@valleyforge.edu")) {
       document.body.innerHTML =
         "<h2 style='font-family:sans-serif;text-align:center;margin-top:100px;'>Access restricted to VFCC accounts.</h2>";
       throw new Error("Unauthorized domain");
