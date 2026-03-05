@@ -1637,19 +1637,11 @@ const OD = (() => {
 
 // ─── MICROSOFT AUTH + OD INIT ────────────────────────────────────────────────
 
-// ─── FULL PORTAL + MSAL + OD LOGIN ─────────────────────────────────────────────
-
-// ─── FULL WORKING PORTAL + MSAL + OD LOGIN ───────────────────────────────────
-
-const redirectUri = "https://valleyforgeedu.github.io/Reporting-Portal/";
-const approvedUsers = ["sdsullivan@valleyforge.edu"]; // extend as needed
-
-// MSAL config
 const msalConfig = {
   auth: {
     clientId: "30bde775-3b2a-4aa1-814d-0991dd3f2bda",
     authority: "https://login.microsoftonline.com/aaa272b8-3164-4829-9149-92c872fd36df",
-    redirectUri
+    redirectUri: window.location.origin
   }
 };
 
@@ -1657,58 +1649,57 @@ const msalInstance = new msal.PublicClientApplication(msalConfig);
 let _account = null;
 let reporterName = localStorage.getItem('uvf_reporter_name') || '';
 
-// --- START PORTAL ---
+// List of specifically approved users
+const approvedUsers = [
+  "sdsullivan@valleyforge.edu",
+];
+
+// Initialize the portal after login
 async function startPortal() {
   try {
-    // Handle redirect from Microsoft login
     const response = await msalInstance.handleRedirectPromise();
 
-    // Get account from response or cached accounts
     _account = response?.account || msalInstance.getAllAccounts()[0];
 
     if (!_account) {
-      // No logged-in account → redirect to Microsoft login
-      await msalInstance.loginRedirect({
-        scopes: ["User.Read"],
-        redirectUri
-      });
-      return; // stop until redirect completes
+      await msalInstance.loginRedirect({ scopes: ["User.Read"] });
+      return; // stop execution until redirect completes
     }
 
     msalInstance.setActiveAccount(_account);
 
     const userEmail = _account.username.toLowerCase();
 
-    // Enforce allowed domain
-    if (!userEmail.endsWith("@valleyforge.edu")) {
+    // Check domain
+    if (!userEmail.endsWith("@vfcc.edu")) {
       document.body.innerHTML =
-        "<h2 style='text-align:center;margin-top:100px;'>Access restricted to @valleyforge.edu accounts.</h2>";
-      return;
+        "<h2 style='font-family:sans-serif;text-align:center;margin-top:100px;'>Access restricted to VFCC accounts.</h2>";
+      throw new Error("Unauthorized domain");
     }
 
-    // Enforce approved users
+    // Check approved users
     if (!approvedUsers.includes(userEmail)) {
       document.body.innerHTML =
-        "<h2 style='text-align:center;margin-top:100px;'>Access restricted to approved users only.</h2>";
-      return;
+        "<h2 style='font-family:sans-serif;text-align:center;margin-top:100px;'>Access restricted to approved users only.</h2>";
+      throw new Error("User not approved");
     }
 
     // Show page
     document.body.style.display = "block";
 
-    // Persist reporter name
+    // Save reporter name if not already set
     if (!reporterName) {
       reporterName = _account.name || _account.username;
       localStorage.setItem('uvf_reporter_name', reporterName);
       updateNavAvatar();
     }
 
-    // Initialize OneDrive integration
+    // Initialize OD
     await OD.init();
     await OD.pull();
-    setInterval(() => OD.pull(), 60000); // background sync
+    setInterval(() => OD.pull(), 60000);
 
-    // Portal UI
+    // Start portal UI
     loadReport();
     renderSidebar();
     renderEditor();
@@ -1717,13 +1708,13 @@ async function startPortal() {
     console.log("Logged in:", userEmail);
 
   } catch (error) {
-    console.error(error);
     document.body.innerHTML =
-      "<h2 style='text-align:center;margin-top:100px;'>Microsoft login required. Check console for errors.</h2>";
+      "<h2 style='font-family:sans-serif;text-align:center;margin-top:100px;'>Microsoft login required.</h2>";
+    console.error(error);
   }
 }
 
-// --- OD LOGIN FOR MODAL ---
+// Unified OD login function for modal setup
 async function odLogin(clientId, reporterInput) {
   if (reporterInput) {
     reporterName = reporterInput.trim();
@@ -1737,17 +1728,11 @@ async function odLogin(clientId, reporterInput) {
     msalInstance.config.auth.clientId = clientId;
   }
 
-  await msalInstance.loginRedirect({
-    scopes: ["User.Read"],
-    redirectUri
-  });
+  await msalInstance.loginRedirect({ scopes: ["User.Read"] });
 }
 
-// --- PAGE LOAD ---
-document.addEventListener("DOMContentLoaded", () => {
-  document.body.style.display = "none"; // hide until login check completes
-  startPortal();
-});
+// Start portal
+startPortal();
     
 
 </script>
