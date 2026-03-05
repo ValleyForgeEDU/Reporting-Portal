@@ -1,12 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UVF Institutional Strategic Plan — Reporting Portal</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>UVF Institutional Strategic Plan — Reporting Portal</title>
 
-
-  <!-- MSAL Browser Library -->
+  <!-- ✅ Correct MSAL Browser Library tag -->
   <script src="https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js"></script>
 
   <script>
@@ -17,7 +16,7 @@
   const msalConfig = {
     auth: {
       clientId: "30bde775-3b2a-4aa1-814d-0991dd3f2bda", // Application (client) ID
-      authority: "https://login.microsoftonline.com/aaa272b8-3164-4829-9149-92c872fd36df", // tenant
+      authority: "https://login.microsoftonline.com/aaa272b8-3164-4829-9149-92c872fd36df", // Tenant ID authority
       redirectUri: "https://valleyforgeedu.github.io/Reporting-Portal/", // EXACT redirect URI
       navigateToLoginRequestUrl: false
     },
@@ -27,17 +26,24 @@
     }
   };
 
-  const msalInstance = new msal.PublicClientApplication(msalConfig);
-  let activeAccount = null;
-
   // Optional access gates
-  const requireEmailDomain = "@valleyforge.edu";               // set to null to disable domain check
-  const approvedUsers = ["sdsullivan@valleyforge.edu"];        // set [] to disable allowlist
+  const requireEmailDomain = "@valleyforge.edu";          // set to null to disable domain check
+  const approvedUsers = ["sdsullivan@valleyforge.edu"];   // set [] to disable allowlist
 
   // ── AUTH BOOTSTRAP ─────────────────────────────────────────────────
   async function ensureLogin() {
+    // If MSAL didn't load for any reason, fail closed with a friendly message
+    if (typeof window.msal === "undefined" || !msal?.PublicClientApplication) {
+      showError("Microsoft auth library failed to load. Check network filters and try again.");
+      console.error("MSAL not available: https://alcdn.msauth.net blocked or tag incorrect?");
+      return;
+    }
+
+    const msalInstance = new msal.PublicClientApplication(msalConfig);
+    let activeAccount = null;
+
     try {
-      // Must process redirect hash first on load
+      // Process the redirect hash first (if any)
       const response = await msalInstance.handleRedirectPromise();
       activeAccount = response?.account || msalInstance.getAllAccounts()[0];
 
@@ -47,7 +53,7 @@
           scopes: ["User.Read"],
           redirectUri: msalConfig.auth.redirectUri
         });
-        return; // execution will resume after redirect roundtrip
+        return; // execution resumes after redirect round-trip
       }
 
       msalInstance.setActiveAccount(activeAccount);
@@ -65,20 +71,16 @@
         return;
       }
 
-      // Auth OK → initialize the portal AFTER auth
+      // Auth OK → initialize your portal AFTER auth
       await initPortal(activeAccount);
       document.documentElement.style.visibility = "visible";
     } catch (err) {
       console.error("MSAL auth error:", err);
-      // Friendly error (e.g., redirect URI mismatch, blocked, etc.)
+      // Friendly message + hint for common Azure config issues
       let msg = "Microsoft login error. Please refresh the page.";
-      // Add a helpful hint for common misconfig
       const text = String(err?.message || err || "");
       if (text.includes("AADSTS50011") || text.includes("redirect_uri_mismatch")) {
-        msg = `Redirect URI mismatch. In Azure → App registrations → Authentication (SPA), add this URI exactly:
-<code>${location.href.split('#')[0].split('?')[0]}</code>`;
-      } else if (text.includes("popup_window_error")) {
-        msg = "Popup blocked — though this flow uses redirects, ensure your browser allows redirects for this site.";
+        msg = `Redirect URI mismatch. In Azure → App registrations → Authentication (SPA), add this URI exactly:<br><code>${location.href.split('#')[0].split('?')[0]}</code>`;
       }
       showError(msg);
     }
@@ -100,7 +102,7 @@
   window.addEventListener("DOMContentLoaded", ensureLogin);
   </script>
 
-  <!-- AFTER-AUTH INITIALIZER: move your page startup into this function. -->
+  <!-- AFTER-AUTH INITIALIZER: calls your existing functions, but only after login -->
   <script>
   async function initPortal(account) {
     // 1) Set/display the reporter name for the avatar
@@ -112,7 +114,6 @@
         localStorage.setItem('uvf_reporter_name', reporterName);
       }
       if (typeof updateNavAvatar === 'function') {
-        // Your page already implements updateNavAvatar()
         updateNavAvatar();
       }
     } catch (_) {}
