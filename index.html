@@ -1840,14 +1840,54 @@ const msalConfig = {
 };
 
 const msalInstance = new msal.PublicClientApplication(msalConfig);
+msalInstance.handleRedirectPromise().then(async (response) => {
 
+  let account;
+
+  if (response) {
+    account = response.account;
+    msalInstance.setActiveAccount(account);
+  } else {
+    const accounts = msalInstance.getAllAccounts();
+
+    if (accounts.length > 0) {
+      account = accounts[0];
+      msalInstance.setActiveAccount(account);
+    }
+  }
+
+  if (!account) {
+
+    await msalInstance.loginRedirect({
+      scopes: ["User.Read"]
+    });
+
+    return;
+  }
+
+  console.log("Logged in:", account.username);
+
+  document.body.style.display = "block";
+
+  // start your portal
+  loadReport();
+  renderSidebar();
+  renderEditor();
+  updateNavAvatar();
+  OD.init();
+
+}).catch(error => {
+
+  console.error(error);
+
+});
 async function startPortal() {
 
   try {
 
-    const response = await msalInstance.loginPopup({
-      scopes: ["User.Read"]
-    });
+    await msalInstance.loginRedirect({
+  scopes: ["User.Read"]
+});
 
     console.log("Logged in:", response.account.username);
     const approvedUsers = [
