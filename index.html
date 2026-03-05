@@ -25,58 +25,22 @@ const msalConfig = {
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 let _account = null;
 let reporterName = localStorage.getItem('uvf_reporter_name') || '';
-const approvedUsers = ["sdsullivan@valleyforge.edu"]; // add more if needed
-
-// ─── PORTAL AFTER LOGIN ──────────────────────────────────────
-async function runPortalAfterLogin() {
-  document.body.style.display = "block";
-
-  if (!reporterName) {
-    reporterName = _account.name || _account.username;
-    localStorage.setItem('uvf_reporter_name', reporterName);
-    updateNavAvatar();
-  }
-
-  try {
-    await OD.init();
-    await OD.pull();
-    setInterval(() => OD.pull(), 60000);
-
-    loadReport();
-    renderSidebar();
-    renderEditor();
-    updateNavAvatar();
-
-    console.log("Logged in:", _account.username);
-  } catch (portalErr) {
-    console.error("Portal initialization failed:", portalErr);
-    const errEl = document.createElement("p");
-    errEl.style.color = "red";
-    errEl.style.textAlign = "center";
-    errEl.textContent = "Portal partially failed. Check console for details.";
-    document.body.appendChild(errEl);
-  }
-}
+const approvedUsers = ["sdsullivan@valleyforge.edu"]; // optional approved users
 
 // ─── LOGIN + REDIRECT HANDLING ───────────────────────────────
-(async () => {
+async function ensureLogin() {
   try {
     const response = await msalInstance.handleRedirectPromise();
-    let account = response?.account || msalInstance.getAllAccounts()[0];
+    _account = response?.account || msalInstance.getAllAccounts()[0];
 
-    if (!account) {
-      // No cached account — force login
-      await msalInstance.loginRedirect({
-        scopes: ["User.Read"],
-        redirectUri
-      });
-      return; // stops execution until login completes
+    if (!_account) {
+      msalInstance.loginRedirect({ scopes: ["User.Read"], redirectUri });
+      return; // stop until login completes
     }
 
-    msalInstance.setActiveAccount(account);
+    msalInstance.setActiveAccount(_account);
 
-    // enforce domain
-    const email = account.username.toLowerCase();
+    const email = _account.username.toLowerCase();
     if (!email.endsWith("@valleyforge.edu")) {
       document.body.innerHTML = `
         <h2 style="text-align:center;margin-top:100px;">
@@ -86,7 +50,6 @@ async function runPortalAfterLogin() {
       return;
     }
 
-    // enforce approved users (optional)
     if (!approvedUsers.includes(email)) {
       document.body.innerHTML = `
         <h2 style="text-align:center;margin-top:100px;">
@@ -96,18 +59,113 @@ async function runPortalAfterLogin() {
       return;
     }
 
-    _account = account;
     await runPortalAfterLogin();
 
-  } catch (loginErr) {
-    console.error("Login failed:", loginErr);
+  } catch (err) {
+    console.error("Login failed:", err);
     document.body.innerHTML = `
       <h2 style="text-align:center;margin-top:100px;">
         Microsoft login required — check console for details.
       </h2>`;
     document.body.style.display = "block";
   }
-})();
+}
+
+// Start login immediately on page load
+ensureLogin();
+
+// ─── OD + PORTAL LOGIC ───────────────────────────────────────
+async function runPortalAfterLogin() {
+  document.body.style.display = "block";
+
+  if (!reporterName) {
+    reporterName = _account.name || _account.username;
+    localStorage.setItem('uvf_reporter_name', reporterName);
+    updateNavAvatar();
+  }
+
+  // OD push/pull helpers
+  async function push(silent=false) {
+    if (!OD || !_account) return;
+    if (!silent) setUI('Pushing to OneDrive…', 'syncing', 'connected');
+    try {
+      let kpiData = [];
+      let remoteReports = {};
+      try {
+        const r2 = await gFetch(`/me/drive/root:/${FILE_NAME}:/content`);
+        if (r2.ok) {
+          const existing = await r2.json();
+          kpiData = existing?.kpiData || (Array.isArray(existing) ? existing : []);
+          remoteReports = existing?.reports || {};
+        }
+      } catch(e) {}
+      const merged = { ...remoteReports, ...state.reports };
+      const payload = JSON.stringify({ kpiData, reports: merged }, null, 2);
+      const r = await gFetch(`/me/drive/root:/${FILE_NAME}:/content`, {
+        method: 'PUT', headers: {'Content-Type':'application/json'}, rawBody: payload
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (!silent) {
+        const ts = new Date().toLocaleTimeString();
+        const who = _account?.name || _account?.username || 'user';
+        setUI(`Connected as <strong>${who}</strong> &nbsp;·&nbsp; <span style="color:#22c55e">✓ Saved</span> &nbsp;·&nbsp; ${ts}`, 'connected', 'connected');
+        showODToast('Saved to OneDrive ✓');
+      }
+    } catch(e) {
+      setUI('Push failed: ' + e.message, 'error', 'connected');
+      if (!silent) showODToast('Push error: ' + e.message);
+    }
+  }
+
+  async function pull() {
+    setUI('Pulling from OneDrive…', 'syncing', 'connected');
+    try {
+      const r = await gFetch(`/me/drive/root:/${FILE_NAME}:/content`);
+      if (r.status === 404) { setUI('No remote file yet — will create on first save.', 'connected', 'connected'); return; }
+      const remote = await r.json();
+      const remoteReports = remote?.reports || {};
+      for (const k of Object.keys(remoteReports)) {
+        if (!state.reports[k]) state.reports[k] = remoteReports[k];
+      }
+      try { localStorage.setItem('uvf_plan_html_v1', JSON.stringify({reports: state.reports})); } catch(e) {}
+      loadReport(); renderEditor();
+      const ts = new Date().toLocaleTimeString();
+      const who = _account?.name || _account?.username || 'user';
+      setUI(`Connected as <strong>${who}</strong> &nbsp;·&nbsp; <span style="color:#22c55e">✓ Synced</span> &nbsp;·&nbsp; ${ts}`, 'connected', 'connected');
+    } catch(e) {
+      setUI('Pull failed: ' + e.message, 'error', 'connected');
+    }
+  }
+
+  function disconnect() {
+    if (!confirm('Disconnect from OneDrive? Local reports preserved.')) return;
+    if (OD && _account) OD.logoutPopup({account:_account}).catch(()=>{});
+    OD = null; _account = null;
+    localStorage.removeItem(LS_KEY);
+    setUI('Not connected', 'disconnected', 'disconnected');
+  }
+
+  // Initialize OD and portal UI
+  try {
+    await OD.init();
+    await pull();
+    setInterval(()=>pull(), 60000);
+    loadReport();
+    renderSidebar();
+    renderEditor();
+    updateNavAvatar();
+  } catch(e) {
+    console.error("Portal initialization failed:", e);
+    const errEl = document.createElement("p");
+    errEl.style.color = "red";
+    errEl.style.textAlign = "center";
+    errEl.textContent = "Portal partially failed. Check console for details.";
+    document.body.appendChild(errEl);
+  }
+
+  // Expose helpers globally if needed
+  window.ODPortal = { push, pull, disconnect };
+}
 
 // ─── OD MODAL LOGIN HELPER ───────────────────────────────
 async function odLogin(clientId, reporterInput) {
@@ -116,20 +174,14 @@ async function odLogin(clientId, reporterInput) {
     localStorage.setItem('uvf_reporter_name', reporterName);
     updateNavAvatar();
   }
-
   if (!clientId) throw new Error("Client ID required.");
-
   if (msalInstance.config.auth.clientId !== clientId) {
     msalInstance.config.auth.clientId = clientId;
   }
-
-  await msalInstance.loginRedirect({
-    scopes: ["User.Read"],
-    redirectUri
-  });
+  await msalInstance.loginRedirect({ scopes: ["User.Read"], redirectUri });
 }
 </script>
-
+  
 <link href="./UVF Institutional Strategic Plan — Reporting Portal_files/css2" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
