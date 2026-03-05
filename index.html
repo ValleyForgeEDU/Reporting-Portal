@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>UVF Institutional Strategic Plan — Reporting Portal</title>
 
-  <!-- ✅ Correct MSAL Browser Library tag -->
-  <script src="https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js"></script>
+  <!-- ✅ Load MSAL (self-hosted, no CDN dependency). This MUST be above the auth gate. -->
+  <script src="./msal-browser.min.js"></script>
 
   <style>
     /* Hide the whole page until we explicitly show it after auth */
@@ -14,38 +14,7 @@
   </style>
 
   <script>
-
-    <!-- Robust MSAL loader with fallback -->
-
-
-
-(function loadMsal() {
-  // Prefer local self-hosted copy (no CDN dependency)
-  const local    = './msal-browser.min.js';
-  // Fallbacks (only used if local fails)
-  const cdn1     = 'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.39.0/lib/msal-browser.min.js';
-  const cdn2     = 'https://unpkg.com/@azure/msal-browser@2.39.0/lib/msal-browser.min.js';
-
-  function addScript(src, label, next) {
-    const s = document.createElement('script');
-    s.src = src;
-    s.async = false;                 // preserve classic execution order
-    s.referrerPolicy = 'no-referrer';
-    s.onload  = () => console.log(`[msal] loaded from ${label}`);
-    s.onerror = () => {
-      console.warn(`[msal] failed from ${label}`);
-      if (typeof next === 'function') next();
-    };
-    document.head.appendChild(s);
-  }
-
-  // Try local → jsDelivr → unpkg
-  addScript(local, 'local', () => addScript(cdn1, 'jsDelivr', () => addScript(cdn2, 'unpkg')));
-})();
-
-
-
-    // ── AUTH GATE (runs ASAP) ───────────────────────────────────────────────
+    // ── AUTH GATE (runs after DOM parsed; MSAL is already loaded) ────────────
 
     // MSAL config for your Azure AD app
     const msalConfig = {
@@ -76,8 +45,10 @@
 
     async function ensureLogin() {
       console.log("[auth] ensureLogin start");
+
+      // Hard guard in case the script wasn’t present
       if (typeof window.msal === "undefined" || !msal?.PublicClientApplication) {
-        console.error("[auth] MSAL not available (CDN blocked or tag incorrect)");
+        console.error("[auth] MSAL not available");
         showError("Microsoft auth library failed to load. Check network filters and try again.");
         return;
       }
@@ -85,14 +56,14 @@
       const msalInstance = new msal.PublicClientApplication(msalConfig);
 
       try {
-        // Process the redirect result first (if any)
+        // Process redirect result, if any
         const response = await msalInstance.handleRedirectPromise();
         let account = response?.account || msalInstance.getAllAccounts()[0];
 
         if (!account) {
           console.log("[auth] No account → redirecting to Microsoft login");
           await msalInstance.loginRedirect({ scopes: ["User.Read"], redirectUri: msalConfig.auth.redirectUri });
-          return; // will resume after redirect roundtrip
+          return; // resumes after redirect roundtrip
         }
 
         msalInstance.setActiveAccount(account);
@@ -122,9 +93,10 @@
       }
     }
 
-    // Start as early as possible
+    // Run after DOM is parsed; MSAL is already loaded (script tag above)
     window.addEventListener("DOMContentLoaded", ensureLogin);
   </script>
+
 
   <!-- Fonts link from your original -->
   <link href="./UVF Institutional Strategic Plan — Reporting Portal_files/css2" rel="stylesheet">
