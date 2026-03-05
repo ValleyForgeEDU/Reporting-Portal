@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -7,12 +6,11 @@
 <title>UVF Institutional Strategic Plan — Reporting Portal</title>
 
 <!-- MSAL Browser Library -->
-
 <script src="https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js"></script>
 
 <script>
-// Hide page until login
-document.body.style.display = "none";
+// ─── INITIAL SETUP ─────────────────────────────────────────────
+document.body.style.display = "none"; // hide until login
 
 const redirectUri = "https://valleyforgeedu.github.io/Reporting-Portal/";
 const msalConfig = {
@@ -37,7 +35,7 @@ const approvedUsers = ["sdsullivan@valleyforge.edu"];
     if (!_account) {
       // No cached account — redirect to Microsoft login immediately
       msalInstance.loginRedirect({ scopes: ["User.Read"], redirectUri });
-      return;
+      return; // stops everything until login
     }
 
     msalInstance.setActiveAccount(_account);
@@ -157,6 +155,7 @@ async function runPortalAfterLogin() {
   window.ODPortal = { push, pull, disconnect };
 }
 
+// ─── OD MODAL LOGIN HELPER ─────────────────────────────
 async function odLogin(clientId, reporterInput) {
   if (reporterInput) {
     reporterName = reporterInput.trim();
@@ -171,7 +170,6 @@ async function odLogin(clientId, reporterInput) {
 }
 </script>
 
-  
 <link href="./UVF Institutional Strategic Plan — Reporting Portal_files/css2" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
