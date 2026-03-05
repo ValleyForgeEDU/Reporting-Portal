@@ -5,90 +5,140 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>UVF Institutional Strategic Plan — Reporting Portal</title>
 
-<!-- MSAL Browser Library -->
-<script src="https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js"></script>
 
-<script>
-// ── HIDE PAGE UNTIL AUTH ───────────────────────────────────────────
-document.documentElement.style.visibility = "hidden"; // safer than display:none (avoids layout thrash)
+  <!-- MSAL Browser Library -->
+  <script src="https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js"></script>
 
-// ── MSAL CONFIG ────────────────────────────────────────────────────
-// Use your SPA app registration from Azure AD (same as you had)
-const msalConfig = {
-  auth: {
-    clientId: "30bde775-3b2a-4aa1-814d-0991dd3f2bda",             // Application (client) ID
-    authority: "https://login.microsoftonline.com/aaa272b8-3164-4829-9149-92c872fd36df", // Tenant ID authority
-    redirectUri: "https://valleyforgeedu.github.io/Reporting-Portal/",   // EXACT redirect URI in Azure
-    navigateToLoginRequestUrl: false
-  },
-  cache: {
-    cacheLocation: "localStorage",
-    storeAuthStateInCookie: false
+  <script>
+  // ── HIDE PAGE UNTIL AUTH ───────────────────────────────────────────
+  document.documentElement.style.visibility = "hidden"; // avoids FOUC/flicker
+
+  // ── MSAL CONFIG ────────────────────────────────────────────────────
+  const msalConfig = {
+    auth: {
+      clientId: "30bde775-3b2a-4aa1-814d-0991dd3f2bda", // Application (client) ID
+      authority: "https://login.microsoftonline.com/aaa272b8-3164-4829-9149-92c872fd36df", // tenant
+      redirectUri: "https://valleyforgeedu.github.io/Reporting-Portal/", // EXACT redirect URI
+      navigateToLoginRequestUrl: false
+    },
+    cache: {
+      cacheLocation: "localStorage",
+      storeAuthStateInCookie: false
+    }
+  };
+
+  const msalInstance = new msal.PublicClientApplication(msalConfig);
+  let activeAccount = null;
+
+  // Optional access gates
+  const requireEmailDomain = "@valleyforge.edu";               // set to null to disable domain check
+  const approvedUsers = ["sdsullivan@valleyforge.edu"];        // set [] to disable allowlist
+
+  // ── AUTH BOOTSTRAP ─────────────────────────────────────────────────
+  async function ensureLogin() {
+    try {
+      // Must process redirect hash first on load
+      const response = await msalInstance.handleRedirectPromise();
+      activeAccount = response?.account || msalInstance.getAllAccounts()[0];
+
+      if (!activeAccount) {
+        // Not signed in → redirect to Microsoft login immediately
+        await msalInstance.loginRedirect({
+          scopes: ["User.Read"],
+          redirectUri: msalConfig.auth.redirectUri
+        });
+        return; // execution will resume after redirect roundtrip
+      }
+
+      msalInstance.setActiveAccount(activeAccount);
+
+      // Enforce domain gate (optional)
+      const email = (activeAccount.username || "").toLowerCase();
+      if (requireEmailDomain && !email.endsWith(requireEmailDomain)) {
+        showError(`Access restricted to ${requireEmailDomain} accounts.`);
+        return;
+      }
+
+      // Enforce allowlist (optional)
+      if (approvedUsers.length && !approvedUsers.includes(email)) {
+        showError("Access restricted to approved users only.");
+        return;
+      }
+
+      // Auth OK → initialize the portal AFTER auth
+      await initPortal(activeAccount);
+      document.documentElement.style.visibility = "visible";
+    } catch (err) {
+      console.error("MSAL auth error:", err);
+      // Friendly error (e.g., redirect URI mismatch, blocked, etc.)
+      let msg = "Microsoft login error. Please refresh the page.";
+      // Add a helpful hint for common misconfig
+      const text = String(err?.message || err || "");
+      if (text.includes("AADSTS50011") || text.includes("redirect_uri_mismatch")) {
+        msg = `Redirect URI mismatch. In Azure → App registrations → Authentication (SPA), add this URI exactly:
+<code>${location.href.split('#')[0].split('?')[0]}</code>`;
+      } else if (text.includes("popup_window_error")) {
+        msg = "Popup blocked — though this flow uses redirects, ensure your browser allows redirects for this site.";
+      }
+      showError(msg);
+    }
   }
-};
 
-const msalInstance = new msal.PublicClientApplication(msalConfig);
-let activeAccount = null;
-
-// Optional hard gate(s)
-const requireEmailDomain = "@valleyforge.edu";          // set to null to disable domain gate
-const approvedUsers = ["sdsullivan@valleyforge.edu"];   // set [] to disable allowlist
-
-// ── AUTH BOOTSTRAP ─────────────────────────────────────────────────
-async function ensureLogin() {
-  // Process Azure redirect responses first
-  const response = await msalInstance.handleRedirectPromise().catch(err => {
-    console.error("MSAL handleRedirectPromise error:", err);
-    showError("Microsoft login error. Please refresh.");
-    throw err;
-  });
-
-  // Try to get the account either from the redirect response or cache
-  activeAccount = response?.account || msalInstance.getAllAccounts()[0];
-
-  if (!activeAccount) {
-    // Not signed in → redirect immediately
-    await msalInstance.loginRedirect({
-      scopes: ["User.Read"],               // basic profile scope
-      redirectUri: msalConfig.auth.redirectUri
-    });
-    return; // execution stops here due to redirect
+  function showError(msg) {
+    document.body.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0F2240;color:#fff">
+        <div style="max-width:720px;padding:24px;text-align:center;font-family:Segoe UI, Arial">
+          <div style="font-size:38px;margin-bottom:8px">🔒</div>
+          <div style="font-size:18px;font-weight:700;margin-bottom:6px">Access blocked</div>
+          <div style="opacity:.9">${msg}</div>
+        </div>
+      </div>`;
+    document.documentElement.style.visibility = "visible";
   }
 
-  msalInstance.setActiveAccount(activeAccount);
+  // Kick off as early as possible
+  window.addEventListener("DOMContentLoaded", ensureLogin);
+  </script>
 
-  // Gate by email domain (optional)
-  const email = (activeAccount.username || "").toLowerCase();
-  if (requireEmailDomain && !email.endsWith(requireEmailDomain)) {
-    showError(`Access restricted to ${requireEmailDomain} accounts.`);
-    return;
+  <!-- AFTER-AUTH INITIALIZER: move your page startup into this function. -->
+  <script>
+  async function initPortal(account) {
+    // 1) Set/display the reporter name for the avatar
+    try {
+      const cached = localStorage.getItem('uvf_reporter_name');
+      const derived = account?.name || account?.username || "";
+      const reporterName = cached || derived || "";
+      if (reporterName && !cached) {
+        localStorage.setItem('uvf_reporter_name', reporterName);
+      }
+      if (typeof updateNavAvatar === 'function') {
+        // Your page already implements updateNavAvatar()
+        updateNavAvatar();
+      }
+    } catch (_) {}
+
+    // 2) Initialize your app ONLY AFTER auth
+    try {
+      // If you use your OneDrive module, re-connect silently if a clientId exists
+      if (typeof OD !== 'undefined' && OD && typeof OD.init === 'function') {
+        await OD.init();     // reconnect if previously connected
+        await OD.pull();     // initial sync
+        setInterval(() => OD.pull(), 60000); // keep data fresh
+      }
+
+      // Load and render your UI
+      if (typeof loadReport === 'function') loadReport();
+      if (typeof renderSidebar === 'function') renderSidebar();
+      if (typeof renderEditor === 'function') renderEditor();
+    } catch (e) {
+      console.error("Portal initialization failed:", e);
+      const p = document.createElement('p');
+      p.style.cssText = "color:#a00;text-align:center;margin:12px;font-family:Segoe UI,Arial";
+      p.textContent = "Portal failed to initialize fully. Check the console for details.";
+      document.body.appendChild(p);
+    }
   }
-
-  // Gate by allowlist (optional)
-  if (approvedUsers.length && !approvedUsers.includes(email)) {
-    showError("Access restricted to approved users only.");
-    return;
-  }
-
-  // Auth OK → proceed to app
-  await initPortal(activeAccount);
-  document.documentElement.style.visibility = "visible";
-}
-
-function showError(msg) {
-  document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0F2240;color:#fff">
-    <div style="max-width:640px;padding:24px;text-align:center;font-family:Segoe UI, Arial">
-      <div style="font-size:38px;margin-bottom:8px">🔒</div>
-      <div style="font-size:18px;font-weight:700;margin-bottom:6px">Access blocked</div>
-      <div style="opacity:.85">${msg}</div>
-    </div>
-  </div>`;
-  document.documentElement.style.visibility = "visible";
-}
-
-// Kick off as soon as possible
-window.addEventListener("DOMContentLoaded", ensureLogin);
-</script>
+  </script>
 
 <link href="./UVF Institutional Strategic Plan — Reporting Portal_files/css2" rel="stylesheet">
 <style>
