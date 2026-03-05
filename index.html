@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>UVF Institutional Strategic Plan — Reporting Portal</title>
 
-  <!-- ✅ Load MSAL (self-hosted in repo root). MUST be above the auth gate. -->
+  <!-- ✅ Load MSAL from your repo root (next to index.html). MUST be above the auth gate. -->
   <script src="./msal-browser.min.js"></script>
 
   <style>
@@ -14,7 +14,7 @@
   </style>
 
   <script>
-    // ── AUTH GATE ────────────────────────────────────────────────────────────
+    // ── AUTH GATE (runs after DOM parsed; MSAL is already loaded by the tag above) ─────────
 
     // MSAL config for your Azure AD app
     const msalConfig = {
@@ -29,7 +29,7 @@
 
     // Optional gates
     const requireEmailDomain = "@valleyforge.edu";
-    const approvedUsers = ["sdsullivan@valleyforge.edu"];
+    const approvedUsers     = ["sdsullivan@valleyforge.edu"];
 
     function showError(msg) {
       document.body.innerHTML = `
@@ -46,7 +46,7 @@
     async function ensureLogin() {
       console.log("[auth] ensureLogin start");
 
-      // Guard: MSAL must already be loaded by the script tag above
+      // Guard: MSAL must already be present from the tag above
       if (typeof window.msal === "undefined" || !msal?.PublicClientApplication) {
         console.error("[auth] MSAL not available");
         showError("Microsoft auth library failed to load. Check network filters and try again.");
@@ -56,18 +56,22 @@
       const msalInstance = new msal.PublicClientApplication(msalConfig);
 
       try {
-        // Handle redirect result first (if any)
+        // Process redirect response, if any
         const response = await msalInstance.handleRedirectPromise();
         let account = response?.account || msalInstance.getAllAccounts()[0];
 
         if (!account) {
           console.log("[auth] No account → redirecting to Microsoft login");
-          await msalInstance.loginRedirect({ scopes: ["User.Read"], redirectUri: msalConfig.auth.redirectUri });
+          await msalInstance.loginRedirect({
+            scopes: ["User.Read"],
+            redirectUri: msalConfig.auth.redirectUri
+          });
           return; // resumes here after Azure redirect round-trip
         }
 
         msalInstance.setActiveAccount(account);
 
+        // Domain/allowlist enforcement
         const email = (account.username || "").toLowerCase();
         if (requireEmailDomain && !email.endsWith(requireEmailDomain)) {
           showError(`Access restricted to ${requireEmailDomain} accounts.`);
@@ -92,11 +96,9 @@
       }
     }
 
-    // Run after DOM is parsed. MSAL is already loaded by the tag above.
-    // You can use DOMContentLoaded or load; load is the most conservative.
+    // Run after DOM is parsed (MSAL is already loaded)
     window.addEventListener("DOMContentLoaded", ensureLogin);
   </script>
-
 
   <!-- Fonts link from your original -->
   <link href="./UVF Institutional Strategic Plan — Reporting Portal_files/css2" rel="stylesheet">
