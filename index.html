@@ -17,28 +17,27 @@
 
     <!-- Robust MSAL loader with fallback -->
 
-(function loadMsal() {
-  const primary = 'https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js';
-  const fallback = 'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.39.0/lib/msal-browser.min.js';
 
-  function addScript(src, onloadName) {
+(function loadMsal() {
+  const primary  = 'https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.39.0/lib/msal-browser.min.js';
+  const fallback = 'https://unpkg.com/@azure/msal-browser@2.39.0/lib/msal-browser.min.js';
+
+  function addScript(src, label) {
     const s = document.createElement('script');
     s.src = src;
-    s.async = false;               // keep classic script semantics
+    s.async = false;                   // preserve execution order
     s.referrerPolicy = 'no-referrer';
-    s.onload = () => console.log(`[msal] ${onloadName} loaded:`, typeof window.msal === 'object');
+    s.onload  = () => console.log(`[msal] loaded from ${label}`);
     s.onerror = () => {
-      console.warn(`[msal] Failed to load ${src}`);
-      if (src === primary) {
-        // try fallback once
-        addScript(fallback, 'fallback CDN');
-      }
+      console.warn(`[msal] failed to load from ${label}`);
+      if (label === 'jsDelivr') addScript(fallback, 'unpkg');
     };
     document.head.appendChild(s);
   }
 
-  addScript(primary, 'primary CDN');
-}());
+  addScript(primary, 'jsDelivr');
+})();
+
 
     // ── AUTH GATE (runs ASAP) ───────────────────────────────────────────────
 
