@@ -1243,7 +1243,6 @@
 <script src="./msal-browser.min.js"></script>
 
 <script>
-  // === Minimal MSAL auth gate that never blocks the UI and always runs initPortal ===
   const msalConfig = {
     auth: {
       clientId: "30bde775-3b2a-4aa1-814d-0991dd3f2bda",
@@ -1254,17 +1253,13 @@
     cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false }
   };
 
-  // Use a safe Microsoft Graph scope (no custom APIs)
   const loginScopes = ["User.Read"];
-
-  // Optional allowlist
   const requireEmailDomain = "@valleyforge.edu";
   const approvedUsers = ["sdsullivan@valleyforge.edu"];
 
   function showError(msg) {
     const html = `
-      <div style="display:flex;align-items:center;justify-content:center;
-                  min-height:100vh;background:#0F2240;color:#fff">
+      <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0F2240;color:#fff">
         <div style="max-width:720px;padding:24px;text-align:center;font-family:Segoe UI, Arial">
           <div style="font-size:38px;margin-bottom:8px">🔒</div>
           <div style="font-size:18px;font-weight:700;margin-bottom:6px">Access issue</div>
@@ -1274,45 +1269,41 @@
     document.body.insertAdjacentHTML("afterbegin", html);
   }
 
-  // Guaranteed safe way to run your portal AFTER all scripts load
-  function startPortal(account) {
-    const run = async () => {
+  // Run portal AFTER page scripts load AND after MSAL login
+  function runPortal(account) {
+    function start() {
       try {
         if (typeof window.initPortal === "function") {
-          await window.initPortal(account);
-        } else {
-          console.warn("[portal] initPortal() is not defined.");
+          window.initPortal(account);
         }
       } catch (err) {
-        console.error("[portal] Error inside initPortal:", err);
-        showError("There was a problem loading the portal content.");
+        console.error("initPortal error:", err);
+        showError("There was a problem loading the page content.");
       } finally {
-        // ALWAYS unhide the page
         document.documentElement.style.visibility = "visible";
       }
-    };
+    }
 
+    // Wait until the rest of your scripts are fully loaded
     if (document.readyState === "complete") {
-      run();
+      start();
     } else {
-      window.addEventListener("load", run, { once: true });
+      window.addEventListener("load", start, { once: true });
     }
   }
 
   window.addEventListener("DOMContentLoaded", async () => {
+    // MSAL available?
+    if (!window.msal || !msal.PublicClientApplication) {
+      showError("Microsoft auth library failed to load.");
+      document.documentElement.style.visibility = "visible";
+      return;
+    }
+
+    const pca = new msal.PublicClientApplication(msalConfig);
+
     try {
-      if (typeof window.msal === "undefined" || !msal?.PublicClientApplication) {
-        showError("Microsoft authentication library failed to load.");
-        document.documentElement.style.visibility = "visible";
-        return;
-      }
-
-      const pca = new msal.PublicClientApplication(msalConfig);
-
-      // Handle redirect response if returning from login
       const redirectResult = await pca.handleRedirectPromise();
-
-      // Pick the active account
       let account = redirectResult?.account || pca.getAllAccounts()[0];
 
       if (!account) {
@@ -1320,12 +1311,11 @@
           scopes: loginScopes,
           redirectUri: msalConfig.auth.redirectUri
         });
-        return; // Execution resumes here after login
+        return;
       }
 
       pca.setActiveAccount(account);
 
-      // OPTIONAL access controls
       const email = (account.username || "").toLowerCase();
       if (requireEmailDomain && !email.endsWith(requireEmailDomain)) {
         showError(`Access restricted to ${requireEmailDomain} accounts.`);
@@ -1338,24 +1328,14 @@
         return;
       }
 
-      // Expose user to your portal
       window.authAccount = account;
 
-      // NOW start your portal safely
-      startPortal(account);
+      // Run the page
+      runPortal(account);
 
     } catch (err) {
-      console.error("[auth] MSAL error:", err);
-      const msg = String(err?.message || err);
-      if (msg.includes("AADSTS50011") || msg.toLowerCase().includes("redirect_uri")) {
-        showError(
-          `Redirect URI mismatch. In Azure → App registrations → Authentication (SPA), add this URI:<br>
-           <code>${location.href.split('#')[0].split('?')[0]}</code>`
-        );
-      } else {
-        showError("Microsoft sign‑in failed. Please refresh the page.");
-      }
-
+      console.error("MSAL error:", err);
+      showError("Microsoft sign-in error. Please refresh.");
       document.documentElement.style.visibility = "visible";
     }
   });
