@@ -101,6 +101,28 @@
   });
 </script>
 
+<script>
+// Fetch wrapper that auto-attaches the token
+window.apiFetch = async function(path, options = {}) {
+  const token = await window.getAccessToken();
+  if (!token) throw new Error("No access token");
+
+  const url = path.startsWith("http")
+    ? path
+    : path.startsWith("/")
+      ? path
+      : "/" + path;
+
+  const headers = {
+    ...(options.headers || {}),
+    "Authorization": "Bearer " + token,
+    "Accept": "application/json"
+  };
+
+  return fetch(url, { ...options, headers });
+}
+</script>
+  
   <!-- Fonts link from your original -->
   <link href="./UVF Institutional Strategic Plan — Reporting Portal_files/css2" rel="stylesheet">
 
