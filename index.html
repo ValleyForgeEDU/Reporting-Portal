@@ -4,9 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>UVF Institutional Strategic Plan — Reporting Portal</title>
+
+
   
   <!-- Fonts link from your original -->
-  <link href="./UVF Institutional Strategic Plan — Reporting Portal_files/css2" rel="stylesheet">
+    
+  <!-- <link href="./UVF Institutional Strategic Plan — Reporting Portal_files/css2" rel="stylesheet">-->
 
   <style>
     /* === Your CSS (unchanged) === */
@@ -494,17 +497,14 @@
     }
   }
 
-  // ─── DATA ─────────────────────────────────────────────────────────────────
+  // ─── DATA (KEEP YOUR FULL ARRAY HERE) ─────────────────────────────────────
   const DB = { csfs: [] };
 
-  /* === BEGIN YOUR ORIGINAL DB.csfs CONTENT (keep exactly as in your file) ===
-     Example:
-     DB.csfs = [
-       { id: "csf1", title: "Title", subtitle: "Sub", items: [ ... ] },
-       ...
-     ];
-     === END YOUR ORIGINAL DB.csfs CONTENT === */
-  // (Leave this marker, but paste your full DB.csfs assignment above it.)
+  /* === BEGIN YOUR ORIGINAL DB.csfs ASSIGNMENT ===
+  DB.csfs = [
+    ... your full data ...
+  ];
+  === END YOUR ORIGINAL DB.csfs ASSIGNMENT === */
 
   // ─── STATE ────────────────────────────────────────────────────────────────
   let state = {
@@ -525,7 +525,7 @@
       const p = JSON.parse(saved);
       state.reports = p.reports || {};
     }
-  } catch (_) {}
+  } catch(e){}
 
   // ─── HELPERS ──────────────────────────────────────────────────────────────
   function findGoal(id) {
@@ -536,7 +536,7 @@
   }
   function fmtDate(d) {
     if (!d) return '';
-    const [y, m, day] = d.split('-');
+    const [y,m,day] = d.split('-');
     return `${m}/${day}/${y}`;
   }
   const reportKey = () => `${state.activeGoalId}_${state.selectedYear}`;
@@ -546,7 +546,7 @@
     if (r) {
       state.status = r.status || "Not Started";
       state.results = r.results || "";
-      state.kpiProgress = r.kpiProgress ? { ...r.kpiProgress } : {};
+      state.kpiProgress = r.kpiProgress ? {...r.kpiProgress} : {};
       state.evidenceFiles = r.evidence ? [...r.evidence] : [];
     } else {
       state.status = "Not Started";
@@ -561,25 +561,19 @@
     state.reports[key] = {
       status: state.status,
       results: state.results,
-      kpiProgress: { ...state.kpiProgress },
+      kpiProgress: {...state.kpiProgress},
       evidence: [...state.evidenceFiles],
       savedAt: new Date().toISOString(),
       savedBy: reporterName || 'Unknown Reporter'
     };
-    try { localStorage.setItem("uvf_plan_html_v1", JSON.stringify({ reports: state.reports })); } catch (_) {}
+    try { localStorage.setItem("uvf_plan_html_v1", JSON.stringify({reports: state.reports})); } catch(e){}
     state.lastSaved = new Date();
     if (OD.isConnected()) OD.push();
   }
 
   function statusClass(s) {
-    return {
-      "Not Started": "s-not-started",
-      "Ongoing": "s-ongoing",
-      "Completed": "s-completed",
-      "On Schedule": "s-on-schedule",
-      "Delayed": "s-delayed",
-      "Overdue": "s-overdue"
-    }[s] || "s-not-started";
+    return { "Not Started":"s-not-started","Ongoing":"s-ongoing","Completed":"s-completed",
+             "On Schedule":"s-on-schedule","Delayed":"s-delayed","Overdue":"s-overdue" }[s] || "s-not-started";
   }
 
   // ─── SIDEBAR ──────────────────────────────────────────────────────────────
@@ -588,31 +582,27 @@
     let html = '';
     for (const csf of DB.csfs) {
       const open = !!state.expandedCsfs[csf.id];
-      html += `
-        <div class="csf-block">
-          <button class="csf-btn" onclick="toggleCsf('${csf.id}')">
-            <div class="csf-btn-inner">
-              <div class="csf-num">${csf.id.replace('csf','')}</div>
-              <div>
-                <div class="csf-title">${csf.title}</div>
-                <div class="csf-sub">${csf.subtitle}</div>
-              </div>
+      html += `<div class="csf-block">
+        <button class="csf-btn" onclick="toggleCsf('${csf.id}')">
+          <div class="csf-btn-inner">
+            <div class="csf-num">${csf.id.replace('csf','')}</div>
+            <div>
+              <div class="csf-title">${csf.title}</div>
+              <div class="csf-sub">${csf.subtitle}</div>
             </div>
-            <span class="csf-chevron${open ? ' open' : ''}">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-            </span>
-          </button>
-          <div class="csf-children${open ? ' open' : ''}">
-      `;
+          </div>
+          <span class="csf-chevron${open?' open':''}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </span>
+        </button>
+        <div class="csf-children${open?' open':''}">`;
       for (const item of csf.items) {
         if (item.type === 'goal') {
           const active = item.id === state.activeGoalId;
-          html += `
-            <button class="goal-btn${active ? ' active' : ''}" onclick="selectGoal('${item.id}')">
-              <span class="goal-num">${item.number}</span>
-              <span class="goal-name">${item.name}</span>
-            </button>
-          `;
+          html += `<button class="goal-btn${active?' active':''}" onclick="selectGoal('${item.id}')">
+            <span class="goal-num">${item.number}</span>
+            <span class="goal-name">${item.name}</span>
+          </button>`;
         } else {
           html += `<div class="group-label">${item.title}</div>`;
         }
@@ -636,44 +626,39 @@
     let kpiHtml = '';
     goal.kpis.forEach((kpi, i) => {
       const checked = !!state.kpiProgress[i];
-      kpiHtml += `
-        <div class="kpi-item${checked ? ' done' : ''}" onclick="toggleKpi(${i})">
-          <div class="kpi-check">
-            ${checked ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
-          </div>
-          <span class="kpi-text">${escHtml(kpi)}</span>
-        </div>`;
+      kpiHtml += `<div class="kpi-item${checked?' done':''}" onclick="toggleKpi(${i})">
+        <div class="kpi-check">${checked ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}</div>
+        <span class="kpi-text">${escHtml(kpi)}</span>
+      </div>`;
     });
 
     let evidenceHtml = '';
     if (state.evidenceFiles.length === 0) {
-      evidenceHtml = `
-        <div class="evidence-empty">
-          <div class="evidence-empty-title">No evidence uploaded yet</div>
-          <div class="evidence-empty-sub">Drag and drop files here, or use the upload button above.</div>
-        </div>`;
+      evidenceHtml = `<div class="evidence-empty">
+        <div class="evidence-empty-title">No evidence uploaded yet</div>
+        <div class="evidence-empty-sub">Drag and drop files here, or use the upload button above.</div>
+      </div>`;
     } else {
       evidenceHtml = `<div class="evidence-list">`;
       state.evidenceFiles.forEach((f, i) => {
-        evidenceHtml += `
-          <div class="evidence-item">
-            <div style="display:flex;align-items:center;gap:12px">
-              <div class="evidence-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></div>
-              <div>
-                <div class="evidence-name">${escHtml(f.name)}</div>
-                <div class="evidence-date">Uploaded ${f.date}</div>
-              </div>
+        evidenceHtml += `<div class="evidence-item">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div class="evidence-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+            <div>
+              <div class="evidence-name">${escHtml(f.name)}</div>
+              <div class="evidence-date">Uploaded ${f.date}</div>
             </div>
-            <button class="evidence-del" onclick="removeEvidence(${i})">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-            </button>
-          </div>`;
+          </div>
+          <button class="evidence-del" onclick="removeEvidence(${i})">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          </button>
+        </div>`;
       });
       evidenceHtml += `</div>`;
     }
 
     const lastSavedStr = state.lastSaved
-      ? `Saved at ${state.lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+      ? `Saved at ${state.lastSaved.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`
       : 'Not yet saved this session';
 
     el.innerHTML = `
@@ -722,7 +707,7 @@
             <label class="field-label accent">Current Status *</label>
             <select class="field-select" onchange="onStatusChange(this.value)">
               ${["Not Started","Ongoing","Completed","On Schedule","Delayed","Overdue"].map(s =>
-                `<option value="${s}"${s === state.status ? ' selected' : ''}>${s}</option>`).join('')}
+                `<option value="${s}"${s===state.status?' selected':''}>${s}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -779,7 +764,9 @@
                 <span>Completion Progress</span>
                 <span class="kpi-count">${done}/${total} KPIs (${pct}%)</span>
               </div>
-              <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+              <div class="progress-track">
+                <div class="progress-fill" style="width:${pct}%"></div>
+              </div>
             </div>
           </div>
 
@@ -800,10 +787,10 @@
 
   // ─── ESCAPE HELPERS ───────────────────────────────────────────────────────
   function escHtml(str) {
-    return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
   function escAttr(str) {
-    return String(str ?? '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    return String(str||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
   // ─── EVENT HANDLERS ───────────────────────────────────────────────────────
@@ -816,8 +803,8 @@
     loadReport();
     renderSidebar();
     renderEditor();
-    const ma = document.getElementById('mainArea');
-    if (ma) ma.scrollTop = 0;
+    const main = document.getElementById('mainArea');
+    if (main) main.scrollTop = 0;
   }
   function onYearChange(year) {
     state.selectedYear = year;
@@ -844,27 +831,24 @@
 
     const kpiCard = document.querySelector('.kpi-card');
     if (!kpiCard) return;
-    let kpiHtml = `
-      <div class="kpi-header">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-        <span class="kpi-title">KPI Tracking</span>
-      </div>`;
+    let kpiHtml = `<div class="kpi-header">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      <span class="kpi-title">KPI Tracking</span>
+    </div>`;
     goal.kpis.forEach((kpi, i) => {
       const checked = !!state.kpiProgress[i];
-      kpiHtml += `
-        <div class="kpi-item${checked ? ' done' : ''}" onclick="toggleKpi(${i})">
-          <div class="kpi-check">${checked ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}</div>
-          <span class="kpi-text">${escHtml(kpi)}</span>
-        </div>`;
-    });
-    kpiHtml += `
-      <div class="kpi-progress-wrap">
-        <div class="kpi-progress-row">
-          <span>Completion Progress</span>
-          <span class="kpi-count">${done}/${total} KPIs (${pct}%)</span>
-        </div>
-        <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+      kpiHtml += `<div class="kpi-item${checked?' done':''}" onclick="toggleKpi(${i})">
+        <div class="kpi-check">${checked ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}</div>
+        <span class="kpi-text">${escHtml(kpi)}</span>
       </div>`;
+    });
+    kpiHtml += `<div class="kpi-progress-wrap">
+      <div class="kpi-progress-row">
+        <span>Completion Progress</span>
+        <span class="kpi-count">${done}/${total} KPIs (${pct}%)</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+    </div>`;
     kpiCard.innerHTML = kpiHtml;
   }
 
@@ -872,7 +856,7 @@
     const ts = Date.now().toString().slice(-6);
     state.evidenceFiles.push({
       name: `Evidence_${ts}.pdf`,
-      date: new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+      date: new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'})
     });
     renderEvidenceSection();
   }
@@ -881,34 +865,32 @@
     renderEvidenceSection();
   }
   function renderEvidenceSection() {
-    const evidenceCards = document.querySelectorAll('.left-col .card');
-    if (evidenceCards.length < 2) return;
-    const parent = evidenceCards[1];
+    const cards = document.querySelectorAll('.left-col .card');
+    if (cards.length < 2) return;
+    const parent = cards[1];
     const old = parent.querySelector('.evidence-list, .evidence-empty');
     if (old) old.remove();
     let evidenceHtml = '';
     if (state.evidenceFiles.length === 0) {
-      evidenceHtml = `
-        <div class="evidence-empty">
-          <div class="evidence-empty-title">No evidence uploaded yet</div>
-          <div class="evidence-empty-sub">Drag and drop files here, or use the upload button above.</div>
-        </div>`;
+      evidenceHtml = `<div class="evidence-empty">
+        <div class="evidence-empty-title">No evidence uploaded yet</div>
+        <div class="evidence-empty-sub">Drag and drop files here, or use the upload button above.</div>
+      </div>`;
     } else {
       evidenceHtml = `<div class="evidence-list">`;
       state.evidenceFiles.forEach((f, i) => {
-        evidenceHtml += `
-          <div class="evidence-item">
-            <div style="display:flex;align-items:center;gap:12px">
-              <div class="evidence-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></div>
-              <div>
-                <div class="evidence-name">${escHtml(f.name)}</div>
-                <div class="evidence-date">Uploaded ${f.date}</div>
-              </div>
+        evidenceHtml += `<div class="evidence-item">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div class="evidence-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+            <div>
+              <div class="evidence-name">${escHtml(f.name)}</div>
+              <div class="evidence-date">Uploaded ${f.date}</div>
             </div>
-            <button class="evidence-del" onclick="removeEvidence(${i})">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-            </button>
-          </div>`;
+          </div>
+          <button class="evidence-del" onclick="removeEvidence(${i})">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          </button>
+        </div>`;
       });
       evidenceHtml += `</div>`;
     }
@@ -929,7 +911,7 @@
     if (ta) state.results = ta.value;
     saveReport();
     const ls = document.querySelector('.last-saved');
-    if (ls) ls.textContent = `Saved at ${state.lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    if (ls) ls.textContent = `Saved at ${state.lastSaved.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`;
     showToast();
   }
 
@@ -951,7 +933,7 @@
     let _app = null;
     let _account = null;
 
-    const saved = (() => { try { return JSON.parse(localStorage.getItem(LS_KEY) || 'null') || {}; } catch(e){ return {}; } })();
+    const saved = (() => { try { return JSON.parse(localStorage.getItem(LS_KEY)||'null')||{}; } catch(e){return{};} })();
 
     function persist() {
       localStorage.setItem(LS_KEY, JSON.stringify({
@@ -966,7 +948,7 @@
       const msg = document.getElementById('od-status');
       if (dot) dot.className = 'od-dot ' + dotClass;
       if (msg) msg.innerHTML = '<strong>OneDrive:</strong> ' + text;
-      const show = (id, v) => { const el = document.getElementById(id); if (el) el.style.display = v ? '' : 'none'; };
+      const show = (id, v) => { const el=document.getElementById(id); if(el) el.style.display=v?'':'none'; };
       const conn = mode === 'connected';
       show('od-btn-connect', !conn);
       show('od-btn-pull',    conn);
@@ -1017,25 +999,21 @@
       }
     }
 
-    async function gFetch(path, opts = {}) {
+    async function gFetch(path, opts={}) {
       const token = await getToken();
       const res = await fetch(GRAPH + path, {
         ...opts,
-        headers: {
-          'Authorization': 'Bearer ' + token,
-          ...(opts.rawBody ? {} : { 'Content-Type': 'application/json' }),
-          ...(opts.headers || {})
-        },
+        headers: { 'Authorization': 'Bearer ' + token, ...(opts.rawBody?{}:{'Content-Type':'application/json'}), ...(opts.headers||{}) },
         body: opts.rawBody || opts.body,
       });
       if (!res.ok && res.status !== 404) {
-        const errText = await res.text().catch(() => '');
+        const errText = await res.text().catch(()=> '');
         throw new Error(`HTTP ${res.status}${errText ? ' — ' + errText.slice(0,120) : ''}`);
       }
       return res;
     }
 
-    async function push(silent = false) {
+    async function push(silent=false) {
       if (!_app || !_account) return;
       if (!silent) setUI('Pushing to OneDrive…', 'syncing', 'connected');
       try {
@@ -1048,12 +1026,12 @@
             kpiData = existing?.kpiData || (Array.isArray(existing) ? existing : []);
             remoteReports = existing?.reports || {};
           }
-        } catch (_) {}
+        } catch(_){}
 
         const merged = { ...remoteReports, ...state.reports };
         const payload = JSON.stringify({ kpiData, reports: merged }, null, 2);
         const r = await gFetch(`/me/drive/root:/${FILE_NAME}:/content`, {
-          method: 'PUT', headers: { 'Content-Type':'application/json' }, rawBody: payload
+          method: 'PUT', headers: {'Content-Type':'application/json'}, rawBody: payload
         });
         if (!r.ok) throw new Error('HTTP ' + r.status);
         if (!silent) {
@@ -1078,7 +1056,7 @@
         for (const k of Object.keys(remoteReports)) {
           if (!state.reports[k]) state.reports[k] = remoteReports[k];
         }
-        try { localStorage.setItem('uvf_plan_html_v1', JSON.stringify({ reports: state.reports })); } catch (_) {}
+        try { localStorage.setItem('uvf_plan_html_v1', JSON.stringify({reports: state.reports})); } catch(e){}
         loadReport(); renderEditor();
         const ts = new Date().toLocaleTimeString();
         const who = _account?.name || _account?.username || 'user';
@@ -1090,7 +1068,7 @@
 
     function disconnect() {
       if (!confirm('Disconnect from OneDrive? Local reports preserved.')) return;
-      if (_app && _account) _app.logoutPopup({ account:_account }).catch(() => {});
+      if (_app && _account) _app.logoutPopup({account:_account}).catch(()=>{});
       _app = null; _account = null;
       localStorage.removeItem(LS_KEY);
       setUI('Not connected', 'disconnected', 'disconnected');
@@ -1109,7 +1087,7 @@
         _account = accounts[0];
         setUI('Reconnecting…', 'connecting', 'connected');
         await pull();
-        setInterval(() => pull(), 60000);
+        setInterval(()=>pull(), 60000);
       } catch(e) {
         setUI('Reconnect failed — <a onclick="openODSetup()" style="color:#60a5fa;cursor:pointer;text-decoration:underline">click to reconnect</a>', 'error', 'disconnected');
       }
@@ -1121,14 +1099,14 @@
     };
   })();
 
-  function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   function showODToast(msg) {
     const t = document.getElementById('toast');
     if (!t) return;
     t.textContent = msg;
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
+    setTimeout(()=>t.classList.remove('show'), 3000);
   }
 
   // ── OD Modal UI ───────────────────────────────────────────────────────────
@@ -1141,15 +1119,15 @@
   }
   function odCopyUri() {
     const el = document.getElementById('od-redirect-uri');
-    if (el) navigator.clipboard.writeText(el.textContent).then(() => showODToast('URI copied!')).catch(() => {});
+    if (el) navigator.clipboard.writeText(el.textContent).then(()=>showODToast('URI copied!')).catch(()=>{});
   }
   function odShowError(msg) {
     const el = document.getElementById('od-error-box');
-    if (el) { el.style.display = 'block'; el.innerHTML = '⚠ ' + esc(msg); }
+    if (el) { el.style.display='block'; el.innerHTML='⚠ '+esc(msg); }
   }
   function odClearError() {
     const el = document.getElementById('od-error-box');
-    if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+    if (el) { el.style.display='none'; el.innerHTML=''; }
   }
 
   function openODSetup() {
@@ -1178,7 +1156,7 @@
   async function startODAuth() {
     odClearError();
     const nameVal = document.getElementById('od-reporter-name').value.trim();
-    if (nameVal) { reporterName = nameVal; localStorage.setItem('uvf_reporter_name', reporterName); updateNavAvatar(); }
+    if (nameVal) { reporterName=nameVal; localStorage.setItem('uvf_reporter_name', reporterName); updateNavAvatar(); }
     const clientId = document.getElementById('od-client-id').value.trim();
     if (!clientId) { odShowError('Please paste your Azure Application (Client) ID.'); return; }
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clientId)) {
@@ -1192,7 +1170,7 @@
       document.getElementById('od-step-success').style.display = 'block';
       document.getElementById('od-success-user').textContent = result.account?.name || result.account?.username || '';
       await OD.pull();
-      setInterval(() => OD.pull(), 60000);
+      setInterval(()=>OD.pull(), 60000);
     } catch(e) {
       document.getElementById('od-step-auth').style.display = 'none';
       document.getElementById('od-step-1').style.display    = 'block';
@@ -1233,7 +1211,7 @@
         reporterName = nameToUse;
       }
       updateNavAvatar();
-    } catch (_) {}
+    } catch(_){}
 
     // Initialize data + UI
     try {
@@ -1241,7 +1219,6 @@
       renderSidebar();
       renderEditor();
 
-      // Reconnect OneDrive if a clientId was saved previously
       if (typeof OD !== 'undefined' && OD && typeof OD.init === 'function') {
         await OD.init();
         setInterval(() => OD.pull(), 60000);
@@ -1255,14 +1232,19 @@
     }
   }
 
-  // Export to MSAL block
+  // Expose to MSAL block
   window.initPortal = initPortal;
 </script>
 
-<!-- MSAL (single include) -->
-<script src="./msal-browser.min.js"></script>
+<!-- MSAL (single include; file must be next to this HTML) -->
+<script src="msal-browser.min.js"></script>
 
 <script>
+  // Unhide UI on full load as a safety net (even on errors)
+  window.addEventListener("load", () => {
+    document.documentElement.style.visibility = "visible";
+  });
+
   // MSAL configuration
   const msalConfig = {
     auth: {
@@ -1325,10 +1307,7 @@
       let account = redirectResult?.account || pca.getAllAccounts()[0];
 
       if (!account) {
-        await pca.loginRedirect({
-          scopes: loginScopes,
-          redirectUri: msalConfig.auth.redirectUri
-        });
+        await pca.loginRedirect({ scopes: loginScopes, redirectUri: msalConfig.auth.redirectUri });
         return;
       }
 
@@ -1348,6 +1327,7 @@
 
       window.authAccount = account;
       runPortal(account);
+
     } catch (err) {
       console.error("MSAL error:", err);
       showError("Microsoft sign-in error. Please refresh.");
@@ -1355,5 +1335,6 @@
     }
   });
 </script>
+
 </body>
 </html>
