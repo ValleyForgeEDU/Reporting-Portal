@@ -13,23 +13,22 @@
     html { visibility: hidden; }
   </style>
 
- <script>
-  // ── AUTH GATE (runs after DOM parsed; MSAL is already loaded by the tag above) ─────────
-
-  // MSAL config for your Azure AD app
+<script>
+  // === Minimal MSAL auth gate to fix AADSTS90013 and let the page load ===
   const msalConfig = {
     auth: {
       clientId: "30bde775-3b2a-4aa1-814d-0991dd3f2bda",
       authority: "https://login.microsoftonline.com/aaa272b8-3164-4829-9149-92c872fd36df",
+      // IMPORTANT: this must exactly match a SPA redirect URI registered in Azure (incl. trailing slash)
       redirectUri: "https://valleyforgeedu.github.io/Reporting-Portal/",
       navigateToLoginRequestUrl: false
     },
     cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false }
   };
 
-onst apiScopes = ["User.Read"];
+  // ✅ Only request a known-good Graph scope until your API scope exists
+  const loginScopes = ["User.Read"];
 
-  // Optional gates
   const requireEmailDomain = "@valleyforge.edu";
   const approvedUsers     = ["sdsullivan@valleyforge.edu"];
 
@@ -38,61 +37,37 @@ onst apiScopes = ["User.Read"];
       <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0F2240;color:#fff">
         <div style="max-width:720px;padding:24px;text-align:center;font-family:Segoe UI, Arial">
           <div style="font-size:38px;margin-bottom:8px">🔒</div>
-          <div style="font-size:18px;font-weight:700;margin-bottom:6px">Access blocked</div>
+          <div style="font-size:18px;font-weight:700;margin-bottom:6px">Access issue</div>
           <div style="opacity:.9">${msg}</div>
         </div>
       </div>`;
     document.documentElement.style.visibility = "visible";
   }
 
-  // CHANGE: expose a safe console helper
-  const log = (...a) => { try { console.log(...a); } catch {} };
-
-  async function ensureLogin() {
-    log("[auth] ensureLogin start");
-
-    // Guard: MSAL must already be present from the tag above
+  window.addEventListener("DOMContentLoaded", async () => {
     if (typeof window.msal === "undefined" || !msal?.PublicClientApplication) {
-      console.error("[auth] MSAL not available");
-      showError("Microsoft auth library failed to load. Check network filters and try again.");
+      showError("Microsoft auth library failed to load.");
       return;
     }
 
-    const msalInstance = new msal.PublicClientApplication(msalConfig);
-
-    // CHANGE: helper to acquire token for API calls
-    async function getTokenSilentOrRedirect(account) {
-      try {
-        const silent = await msalInstance.acquireTokenSilent({
-          account,
-          scopes: apiScopes
-        });
-        return silent.accessToken;
-      } catch (silentErr) {
-        // If we can’t get it silently, go interactive via redirect
-        log("[auth] acquireTokenSilent failed; redirecting for consent", silentErr);
-        await msalInstance.acquireTokenRedirect({ scopes: apiScopes });
-        return null; // execution resumes here after redirect
-      }
-    }
+    const pca = new msal.PublicClientApplication(msalConfig);
 
     try {
-      // Process redirect response, if any
-      const response = await msalInstance.handleRedirectPromise();
-      let account = response?.account || msalInstance.getAllAccounts()[0];
+      // Finish any prior redirect
+      const redirectResult = await pca.handleRedirectPromise();
 
+      // Determine the active account
+      let account = redirectResult?.account || pca.getAllAccounts()[0];
+
+      // If no account, start login with only User.Read
       if (!account) {
-        log("[auth] No account → redirecting to Microsoft login");
-        await msalInstance.loginRedirect({
-          scopes: ["User.Read"],              // still get basic profile
-          redirectUri: msalConfig.auth.redirectUri
-        });
-        return; // resumes here after Azure redirect round-trip
+        await pca.loginRedirect({ scopes: loginScopes, redirectUri: msalConfig.auth.redirectUri });
+        return; // resumes here after redirect
       }
 
-      msalInstance.setActiveAccount(account);
+      pca.setActiveAccount(account);
 
-      // Domain/allowlist enforcement
+      // Optional allowlist checks
       const email = (account.username || "").toLowerCase();
       if (requireEmailDomain && !email.endsWith(requireEmailDomain)) {
         showError(`Access restricted to ${requireEmailDomain} accounts.`);
@@ -103,51 +78,27 @@ onst apiScopes = ["User.Read"];
         return;
       }
 
-      // CHANGE: acquire API token now and expose helpers globally
-      const accessToken = await getTokenSilentOrRedirect(account);
-      if (!accessToken) return; // we just redirected for consent; will resume after round-trip
+      // Expose who is signed in (your initPortal can use this)
+      window.authAccount = account;
 
-      // Expose for the rest of your app (e.g., window.initPortal)
-      window.authAccount = account; // who is signed in
-      window.getAccessToken = async () => {
-        try {
-          const fresh = await msalInstance.acquireTokenSilent({ account, scopes: apiScopes });
-          return fresh.accessToken;
-        } catch {
-          // fallback to interactive if needed
-          await msalInstance.acquireTokenRedirect({ scopes: apiScopes });
-          return null;
-        }
-      };
-
-      // CHANGE: convenience helper to call your API with the Bearer token
-      window.apiFetch = async (path, opts = {}) => {
-        const token = await window.getAccessToken();
-        if (!token) return Promise.reject(new Error("No access token"));
-        const url = path.startsWith("http") ? path : API_BASE.replace(/\/?$/, "/") + path.replace(/^\//, "");
-        const headers = Object.assign(
-          { "Accept": "application/json", "Authorization": `Bearer ${token}` },
-          opts.headers || {}
-        );
-        return fetch(url, { ...opts, headers });
-      };
-
-      log("[auth] Auth OK → initializing portal");
+      // Show UI and continue startup
       await window.initPortal?.(account);
       document.documentElement.style.visibility = "visible";
     } catch (err) {
-      console.error("[auth] MSAL auth error:", err);
-      let msg = "Microsoft login error. Please refresh the page.";
-      const text = String(err?.message || err || "");
-      if (text.includes("AADSTS50011") || text.includes("redirect_uri_mismatch")) {
-        msg = `Redirect URI mismatch. In Azure → App registrations → Authentication (SPA), add this URI exactly:<br><code>${location.href.split('#')[0].split('?')[0]}</code>`;
+      console.error("[auth] error:", err);
+      const msg = String(err?.message || err);
+      // Helpful hint if redirect URI is wrong
+      if (msg.includes("AADSTS50011") || msg.toLowerCase().includes("redirect_uri")) {
+        showError(
+          `Redirect URI mismatch. In Azure → App registrations → *ISP Reporting Portal* → Authentication (SPA), add this URI exactly:<br><code>${
+            location.href.split('#')[0].split('?')[0]
+          }</code>`
+        );
+        return;
       }
-      showError(msg);
+      showError("Microsoft sign-in failed. Please refresh and try again.");
     }
-  }
-
-  // Run after DOM is parsed (MSAL is already loaded)
-  window.addEventListener("DOMContentLoaded", ensureLogin);
+  });
 </script>
 
   <!-- Fonts link from your original -->
