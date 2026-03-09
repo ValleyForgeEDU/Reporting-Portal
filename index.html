@@ -572,37 +572,47 @@
   }
 
   function statusClass(s) {
-    return { "Not Started":"s-not-started","Ongoing":"s-ongoing","Completed":"s-completed",
-             "On Schedule":"s-on-schedule","Delayed":"s-delayed","Overdue":"s-overdue" }[s] || "s-not-started";
+    return {
+      "Not Started":"s-not-started",
+      "Ongoing":"s-ongoing",
+      "Completed":"s-completed",
+      "On Schedule":"s-on-schedule",
+      "Delayed":"s-delayed",
+      "Overdue":"s-overdue"
+    }[s] || "s-not-started";
   }
 
   // ─── SIDEBAR ──────────────────────────────────────────────────────────────
   function renderSidebar() {
     const el = document.getElementById('sidebarScroll');
+    if (!el) return;
+
     let html = '';
     for (const csf of DB.csfs) {
       const open = !!state.expandedCsfs[csf.id];
-      html += `<div class="csf-block">
-        <button class="csf-btn" onclick="toggleCsf('${csf.id}')">
-          <div class="csf-btn-inner">
-            <div class="csf-num">${csf.id.replace('csf','')}</div>
-            <div>
-              <div class="csf-title">${csf.title}</div>
-              <div class="csf-sub">${csf.subtitle}</div>
+      html += `
+        <div class="csf-block">
+          <button class="csf-btn" onclick="toggleCsf('${csf.id}')">
+            <div class="csf-btn-inner">
+              <div class="csf-num">${csf.id.replace('csf','')}</div>
+              <div>
+                <div class="csf-title">${csf.title}</div>
+                <div class="csf-sub">${csf.subtitle}</div>
+              </div>
             </div>
-          </div>
-          <span class="csf-chevron${open?' open':''}">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-          </span>
-        </button>
-        <div class="csf-children${open?' open':''}">`;
+            <span class="csf-chevron${open?' open':''}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </span>
+          </button>
+          <div class="csf-children${open?' open':''}">`;
       for (const item of csf.items) {
         if (item.type === 'goal') {
           const active = item.id === state.activeGoalId;
-          html += `<button class="goal-btn${active?' active':''}" onclick="selectGoal('${item.id}')">
-            <span class="goal-num">${item.number}</span>
-            <span class="goal-name">${item.name}</span>
-          </button>`;
+          html += `
+            <button class="goal-btn${active?' active':''}" onclick="selectGoal('${item.id}')">
+              <span class="goal-num">${item.number}</span>
+              <span class="goal-name">${item.name}</span>
+            </button>`;
         } else {
           html += `<div class="group-label">${item.title}</div>`;
         }
@@ -616,7 +626,12 @@
   function renderEditor() {
     const goal = findGoal(state.activeGoalId);
     const el = document.getElementById('editorContainer');
-    if (!goal) { el.innerHTML = '<div class="empty-state">Select a goal from the sidebar to begin reporting.</div>'; return; }
+    if (!el) return;
+
+    if (!goal) {
+      el.innerHTML = '<div class="empty-state">Select a goal from the sidebar to begin reporting.</div>';
+      return;
+    }
 
     const done = Object.values(state.kpiProgress).filter(Boolean).length;
     const total = goal.kpis.length;
@@ -626,33 +641,40 @@
     let kpiHtml = '';
     goal.kpis.forEach((kpi, i) => {
       const checked = !!state.kpiProgress[i];
-      kpiHtml += `<div class="kpi-item${checked?' done':''}" onclick="toggleKpi(${i})">
-        <div class="kpi-check">${checked ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}</div>
-        <span class="kpi-text">${escHtml(kpi)}</span>
-      </div>`;
+      kpiHtml += `
+        <div class="kpi-item${checked?' done':''}" onclick="toggleKpi(${i})">
+          <div class="kpi-check">
+            ${checked ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
+          </div>
+          <span class="kpi-text">${escHtml(kpi)}</span>
+        </div>`;
     });
 
     let evidenceHtml = '';
     if (state.evidenceFiles.length === 0) {
-      evidenceHtml = `<div class="evidence-empty">
-        <div class="evidence-empty-title">No evidence uploaded yet</div>
-        <div class="evidence-empty-sub">Drag and drop files here, or use the upload button above.</div>
-      </div>`;
+      evidenceHtml = `
+        <div class="evidence-empty">
+          <div class="evidence-empty-title">No evidence uploaded yet</div>
+          <div class="evidence-empty-sub">Drag and drop files here, or use the upload button above.</div>
+        </div>`;
     } else {
       evidenceHtml = `<div class="evidence-list">`;
       state.evidenceFiles.forEach((f, i) => {
-        evidenceHtml += `<div class="evidence-item">
-          <div style="display:flex;align-items:center;gap:12px">
-            <div class="evidence-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></div>
-            <div>
-              <div class="evidence-name">${escHtml(f.name)}</div>
-              <div class="evidence-date">Uploaded ${f.date}</div>
+        evidenceHtml += `
+          <div class="evidence-item">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div class="evidence-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </div>
+              <div>
+                <div class="evidence-name">${escHtml(f.name)}</div>
+                <div class="evidence-date">Uploaded ${f.date}</div>
+              </div>
             </div>
-          </div>
-          <button class="evidence-del" onclick="removeEvidence(${i})">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-          </button>
-        </div>`;
+            <button class="evidence-del" onclick="removeEvidence(${i})">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            </button>
+          </div>`;
       });
       evidenceHtml += `</div>`;
     }
@@ -831,24 +853,27 @@
 
     const kpiCard = document.querySelector('.kpi-card');
     if (!kpiCard) return;
-    let kpiHtml = `<div class="kpi-header">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-      <span class="kpi-title">KPI Tracking</span>
-    </div>`;
+    let kpiHtml = `
+      <div class="kpi-header">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        <span class="kpi-title">KPI Tracking</span>
+      </div>`;
     goal.kpis.forEach((kpi, i) => {
       const checked = !!state.kpiProgress[i];
-      kpiHtml += `<div class="kpi-item${checked?' done':''}" onclick="toggleKpi(${i})">
-        <div class="kpi-check">${checked ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}</div>
-        <span class="kpi-text">${escHtml(kpi)}</span>
-      </div>`;
+      kpiHtml += `
+        <div class="kpi-item${checked?' done':''}" onclick="toggleKpi(${i})">
+          <div class="kpi-check">${checked ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}</div>
+          <span class="kpi-text">${escHtml(kpi)}</span>
+        </div>`;
     });
-    kpiHtml += `<div class="kpi-progress-wrap">
-      <div class="kpi-progress-row">
-        <span>Completion Progress</span>
-        <span class="kpi-count">${done}/${total} KPIs (${pct}%)</span>
-      </div>
-      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
-    </div>`;
+    kpiHtml += `
+      <div class="kpi-progress-wrap">
+        <div class="kpi-progress-row">
+          <span>Completion Progress</span>
+          <span class="kpi-count">${done}/${total} KPIs (${pct}%)</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+      </div>`;
     kpiCard.innerHTML = kpiHtml;
   }
 
@@ -872,25 +897,27 @@
     if (old) old.remove();
     let evidenceHtml = '';
     if (state.evidenceFiles.length === 0) {
-      evidenceHtml = `<div class="evidence-empty">
-        <div class="evidence-empty-title">No evidence uploaded yet</div>
-        <div class="evidence-empty-sub">Drag and drop files here, or use the upload button above.</div>
-      </div>`;
+      evidenceHtml = `
+        <div class="evidence-empty">
+          <div class="evidence-empty-title">No evidence uploaded yet</div>
+          <div class="evidence-empty-sub">Drag and drop files here, or use the upload button above.</div>
+        </div>`;
     } else {
       evidenceHtml = `<div class="evidence-list">`;
       state.evidenceFiles.forEach((f, i) => {
-        evidenceHtml += `<div class="evidence-item">
-          <div style="display:flex;align-items:center;gap:12px">
-            <div class="evidence-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></div>
-            <div>
-              <div class="evidence-name">${escHtml(f.name)}</div>
-              <div class="evidence-date">Uploaded ${f.date}</div>
+        evidenceHtml += `
+          <div class="evidence-item">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div class="evidence-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+              <div>
+                <div class="evidence-name">${escHtml(f.name)}</div>
+                <div class="evidence-date">Uploaded ${f.date}</div>
+              </div>
             </div>
-          </div>
-          <button class="evidence-del" onclick="removeEvidence(${i})">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-          </button>
-        </div>`;
+            <button class="evidence-del" onclick="removeEvidence(${i})">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            </button>
+          </div>`;
       });
       evidenceHtml += `</div>`;
     }
@@ -1192,7 +1219,7 @@
 
   // ─── AFTER-AUTH INITIALIZER ───────────────────────────────────────────────
   async function initPortal(account) {
-    // Inject the UI template so nothing renders pre-auth
+    // Inject the UI template (keeps initial DOM visible; no hiding)
     const root = document.getElementById('app-root');
     const tpl  = document.getElementById('app-template');
     if (root && tpl && !root.hasChildNodes()) {
@@ -1240,11 +1267,6 @@
 <script src="msal-browser.min.js"></script>
 
 <script>
-  // Unhide UI on full load as a safety net (even on errors)
-  window.addEventListener("load", () => {
-    document.documentElement.style.visibility = "visible";
-  });
-
   // MSAL configuration
   const msalConfig = {
     auth: {
@@ -1282,8 +1304,6 @@
       } catch (err) {
         console.error("initPortal error:", err);
         showError("There was a problem loading the page content.");
-      } finally {
-        document.documentElement.style.visibility = "visible";
       }
     }
     if (document.readyState === "complete") {
@@ -1296,7 +1316,6 @@
   window.addEventListener("DOMContentLoaded", async () => {
     if (!window.msal || !msal.PublicClientApplication) {
       showError("Microsoft auth library failed to load.");
-      document.documentElement.style.visibility = "visible";
       return;
     }
 
@@ -1316,12 +1335,10 @@
       const email = (account.username || "").toLowerCase();
       if (requireEmailDomain && !email.endsWith(requireEmailDomain)) {
         showError(`Access restricted to ${requireEmailDomain} accounts.`);
-        document.documentElement.style.visibility = "visible";
         return;
       }
       if (approvedUsers.length && !approvedUsers.includes(email)) {
         showError("Access restricted to approved users only.");
-        document.documentElement.style.visibility = "visible";
         return;
       }
 
@@ -1331,7 +1348,6 @@
     } catch (err) {
       console.error("MSAL error:", err);
       showError("Microsoft sign-in error. Please refresh.");
-      document.documentElement.style.visibility = "visible";
     }
   });
 </script>
